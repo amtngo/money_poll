@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Money Poll</title>
+
+<style>
+body { font-family: Arial; text-align: center; padding: 40px; background: #f7f7f7; }
+
+h2 { font-size: 22px; margin-bottom: 30px; }
+
+.option {
+  display: block;
+  width: 80%;
+  max-width: 400px;
+  margin: 10px auto;
+  padding: 15px;
+  font-size: 16px;
+  border: none;
+  background: #fff;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.percent { font-size: 30px; font-weight: bold; margin-top: 20px; }
+.bar { font-size: 18px; margin-top: 10px; }
+
+.result-text { font-size: 18px; margin-top: 15px; }
+
+.btn {
+  margin-top: 30px;
+  padding: 15px 25px;
+  font-size: 18px;
+  background: black;
+  color: white;
+  border-radius: 8px;
+  cursor: pointer;
+}
+</style>
+</head>
+
+<body>
+
+<h2 id="question">Loading...</h2>
+<div id="options"></div>
+<div id="result"></div>
+
+<div id="nextBtn" class="btn" style="display:none;">
+  Try another question
+</div>
+
+<script src="questions.js"></script>
+
+<script>
+const SUPABASE_URL = "https://kxyudttxvsmtgygqustx.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt4eXVkdHR4dnNtdGd5Z3F1c3R4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwMjg4NzEsImV4cCI6MjA5MDYwNDg3MX0.Sj-ort6WEMDm1tYfyU-MyA2qbeMHeqgfz8DqMyZQAKA";
+
+let currentQuestion = null;
+let selectedOptionObj = null;
+
+/* 블록 */
+function renderBlocks(percent) {
+  const filled = Math.floor(percent / 10);
+  let bar = "";
+
+  for (let i = 0; i < 10; i++) {
+    bar += i < filled ? "█" : "░";
+  }
+
+  return bar;
+}
+
+function loadRandomQuestion() {
+  document.getElementById("result").innerHTML = "";
+  document.getElementById("nextBtn").style.display = "none";
+  document.getElementById("question").style.display = "block";
+
+  const randomIndex = Math.floor(Math.random() * questions.length);
+  currentQuestion = questions[randomIndex];
+
+  document.getElementById("question").innerText = currentQuestion.question;
+
+  const container = document.getElementById("options");
+  container.innerHTML = "";
+
+  currentQuestion.options.forEach((opt, index) => {
+    const btn = document.createElement("button");
+    btn.innerText = opt.text; // 🔥 수정 핵심
+    btn.className = "option";
+
+    btn.onclick = () => {
+      container.innerHTML = "";
+      selectedOptionObj = opt; // 🔥 핵심
+      handleVote(index + 1);
+    };
+
+    container.appendChild(btn);
+  });
+}
+
+async function handleVote(option) {
+
+  const qid = currentQuestion.id;
+
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/question_counts?question_id=eq.${qid}`, {
+    headers: {
+      "apikey": SUPABASE_KEY,
+      "Authorization": "Bearer " + SUPABASE_KEY
+    }
+  });
+
+  const row = (await res.json())[0];
+
+  let updateData = {};
+  if (option === 1) updateData.option1 = row.option1 + 1;
+  if (option === 2) updateData.option2 = row.option2 + 1;
+  if (option === 3) updateData.option3 = row.option3 + 1;
+  if (option === 4) updateData.option4 = row.option4 + 1;
+
+  await fetch(`${SUPABASE_URL}/rest/v1/question_counts?question_id=eq.${qid}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      "apikey": SUPABASE_KEY,
+      "Authorization": "Bearer " + SUPABASE_KEY
+    },
+    body: JSON.stringify(updateData)
+  });
+
+  const res2 = await fetch(`${SUPABASE_URL}/rest/v1/question_counts?question_id=eq.${qid}`, {
+    headers: {
+      "apikey": SUPABASE_KEY,
+      "Authorization": "Bearer " + SUPABASE_KEY
+    }
+  });
+
+  const newRow = (await res2.json())[0];
+
+  const counts = [newRow.option1, newRow.option2, newRow.option3, newRow.option4];
+  const total = counts.reduce((a,b)=>a+b,0);
+  const selected = counts[option-1];
+
+  const percent = Math.round((selected + 1) / (total + 4) * 100);
+
+  document.getElementById("question").style.display = "none";
+
+  /* 🔥 핵심 결과 출력 */
+  document.getElementById("result").innerHTML = `
+    <div class="percent">${percent}%</div>
+    <div class="bar">${renderBlocks(percent)}</div>
+
+    <div class="result-text">${selectedOptionObj.result[0]}</div>
+    <div class="result-text">${selectedOptionObj.result[1]}</div>
+  `;
+
+  document.getElementById("nextBtn").style.display = "inline-block";
+}
+
+document.getElementById("nextBtn").onclick = loadRandomQuestion;
+
+loadRandomQuestion();
+</script>
+
+</body>
+</html>
