@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Money Poll</title>
+
+<style>
+body {
+  font-family: Arial, sans-serif;
+  text-align: center;
+  padding: 40px;
+  background: #f7f7f7;
+}
+
+h2 {
+  font-size: 22px;
+  margin-bottom: 30px;
+}
+
+.option {
+  display: block;
+  width: 80%;
+  max-width: 400px;
+  margin: 10px auto;
+  padding: 15px;
+  font-size: 16px;
+  border: none;
+  background: #ffffff;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.option:hover {
+  background: #eaeaea;
+}
+
+/* 결과 영역 */
+.percent {
+  font-size: 30px;
+  font-weight: bold;
+  margin-top: 20px;
+}
+
+.bar {
+  font-size: 18px;
+  margin-top: 10px;
+}
+
+/* 약한 색 */
+.red { color: #ff6b6b; }
+.yellow { color: #ffd166; }
+.green { color: #06d6a0; }
+.gray { color: #ddd; }
+
+#cta {
+  font-size: 18px;
+  margin-top: 20px;
+}
+
+.btn {
+  margin-top: 30px;
+  padding: 15px 25px;
+  font-size: 18px;
+  background: black;
+  color: white;
+  border-radius: 8px;
+  cursor: pointer;
+  display: inline-block;
+}
+</style>
+</head>
+
+<body>
+
+<h2 id="question">Loading...</h2>
+<div id="options"></div>
+
+<div id="result"></div>
+
+<p id="cta" style="display:none;">
+  See what others chose
+</p>
+
+<div id="nextBtn" class="btn" style="display:none;">
+  Try another question
+</div>
+
+<script src="questions.js"></script>
+
+<script>
+const SUPABASE_URL = "https://kxyudttxvsmtgygqustx.supabase.co";
+const SUPABASE_KEY = "YOUR_KEY";
+
+let currentQuestion = null;
+let isProcessing = false;
+
+/* 🔥 10칸 컬러 블록 */
+function renderBlocks(percent) {
+  const filled = Math.floor(percent / 10);
+  let bar = "";
+
+  for (let i = 0; i < 10; i++) {
+    let color = "";
+
+    if (i < 3) color = "red";
+    else if (i < 6) color = "yellow";
+    else color = "green";
+
+    if (i < filled) {
+      bar += `<span class="${color}">█</span>`;
+    } else {
+      bar += `<span class="gray">░</span>`;
+    }
+  }
+
+  return bar;
+}
+
+function loadRandomQuestion() {
+  document.getElementById("result").innerHTML = "";
+  document.getElementById("nextBtn").style.display = "none";
+  document.getElementById("cta").style.display = "none";
+  document.getElementById("question").style.display = "block";
+
+  isProcessing = false;
+
+  const randomIndex = Math.floor(Math.random() * questions.length);
+  currentQuestion = questions[randomIndex];
+
+  document.getElementById("question").innerText = currentQuestion.question;
+
+  const container = document.getElementById("options");
+  container.innerHTML = "";
+
+  currentQuestion.options.forEach((opt, index) => {
+    const btn = document.createElement("button");
+    btn.innerText = opt;
+    btn.className = "option";
+
+    btn.onclick = () => {
+      if (isProcessing) return;
+      isProcessing = true;
+      container.innerHTML = "";
+      handleVote(index + 1);
+    };
+
+    container.appendChild(btn);
+  });
+}
+
+async function handleVote(option) {
+
+  const qid = currentQuestion.id.trim();
+
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/question_counts?question_id=eq.${qid}`,
+    {
+      headers: {
+        "apikey": SUPABASE_KEY,
+        "Authorization": "Bearer " + SUPABASE_KEY,
+        "Accept": "application/json"
+      }
+    }
+  );
+
+  const data = await res.json();
+  const row = data[0];
+
+  let updateData = {};
+
+  if (option === 1) updateData.option1 = row.option1 + 1;
+  if (option === 2) updateData.option2 = row.option2 + 1;
+  if (option === 3) updateData.option3 = row.option3 + 1;
+  if (option === 4) updateData.option4 = row.option4 + 1;
+
+  await fetch(
+    `${SUPABASE_URL}/rest/v1/question_counts?question_id=eq.${qid}`,
+    {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        "apikey": SUPABASE_KEY,
+        "Authorization": "Bearer " + SUPABASE_KEY
+      },
+      body: JSON.stringify(updateData)
+    }
+  );
+
+  const res2 = await fetch(
+    `${SUPABASE_URL}/rest/v1/question_counts?question_id=eq.${qid}`,
+    {
+      headers: {
+        "apikey": SUPABASE_KEY,
+        "Authorization": "Bearer " + SUPABASE_KEY
+      }
+    }
+  );
+
+  const newRow = (await res2.json())[0];
+
+  const o1 = newRow.option1;
+  const o2 = newRow.option2;
+  const o3 = newRow.option3;
+  const o4 = newRow.option4;
+
+  const total = o1 + o2 + o3 + o4;
+
+  let selected = [o1, o2, o3, o4][option - 1];
+
+  const percent = Math.round((selected + 1) / (total + 4) * 100);
+
+  document.getElementById("question").style.display = "none";
+
+  /* 🔥 결과 출력 */
+  document.getElementById("result").innerHTML = `
+    <div class="percent">${percent}%</div>
+    <div class="bar">${renderBlocks(percent)}</div>
+  `;
+
+  document.getElementById("cta").style.display = "block";
+  document.getElementById("nextBtn").style.display = "inline-block";
+}
+
+document.getElementById("nextBtn").onclick = loadRandomQuestion;
+
+loadRandomQuestion();
+</script>
+
+</body>
+</html>
