@@ -1,182 +1,152 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Money Poll</title>
+  <meta charset="UTF-8">
+  <title>Poll</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<style>
-body { font-family: Arial; text-align: center; padding: 40px; background: #f7f7f7; }
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 40px;
+      background: #f5f5f5;
+    }
 
-h2 { font-size: 22px; margin-bottom: 30px; }
+    #container {
+      max-width: 500px;
+      margin: auto;
+      background: white;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
 
-.option {
-  display: block;
-  width: 80%;
-  max-width: 400px;
-  margin: 10px auto;
-  padding: 15px;
-  font-size: 16px;
-  border: none;
-  background: #fff;
-  border-radius: 8px;
-  cursor: pointer;
-}
+    h2 {
+      font-size: 20px;
+      margin-bottom: 30px;
+    }
 
-.percent { font-size: 30px; font-weight: bold; margin-top: 20px; }
-.bar { font-size: 18px; margin-top: 10px; }
+    button {
+      display: block;
+      width: 100%;
+      padding: 15px;
+      margin: 10px 0;
+      font-size: 16px;
+      border: none;
+      border-radius: 8px;
+      background: #333;
+      color: white;
+      cursor: pointer;
+    }
 
-.result-text { font-size: 18px; margin-top: 15px; }
+    button:hover {
+      background: #555;
+    }
 
-.btn {
-  margin-top: 30px;
-  padding: 15px 25px;
-  font-size: 18px;
-  background: black;
-  color: white;
-  border-radius: 8px;
-  cursor: pointer;
-}
+    #result {
+      margin-top: 30px;
+      font-size: 22px;
+      font-weight: bold;
+    }
 
-/* ✔ 색 추가 */
-.red { color: #ff6b6b; }
-.yellow { color: #ffd166; }
-.green { color: #06d6a0; }
-.gray { color: #ddd; }
-
-</style>
+    #nextBtn {
+      margin-top: 20px;
+      background: #007bff;
+    }
+  </style>
 </head>
-
 <body>
 
-<h2 id="question">Loading...</h2>
-<div id="options"></div>
-<div id="result"></div>
-
-<div id="nextBtn" class="btn" style="display:none;">
-  Try another question
+<div id="container">
+  <h2 id="question">Loading...</h2>
+  <div id="options"></div>
+  <div id="result"></div>
+  <button id="nextBtn" style="display:none;">Try another question</button>
 </div>
 
 <script src="questions.js"></script>
 
 <script>
-const SUPABASE_URL = "https://kxyudttxvsmtgygqustx.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt4eXVkdHR4dnNtdGd5Z3F1c3R4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwMjg4NzEsImV4cCI6MjA5MDYwNDg3MX0.Sj-ort6WEMDm1tYfyU-MyA2qbeMHeqgfz8DqMyZQAKA";
+/* =========================
+   여기에 본인 값 입력
+========================= */
+const SUPABASE_URL = "https://foafvsaggjaaewdchfsj.supabase.co";
+const SUPABASE_KEY = "sb_publishable_ttAwXXUz_ODPDayrjV8X7A_5tB_hCPf";
 
-let currentQuestion = null;
-let selectedOptionObj = null;
-
-/* ✔ 컬러 블록 */
-function renderBlocks(percent) {
-  const filled = Math.floor(percent / 10);
-  let bar = "";
-
-  for (let i = 0; i < 10; i++) {
-
-    let color = "";
-
-    if (i < 3) color = "red";
-    else if (i < 6) color = "yellow";
-    else color = "green";
-
-    if (i < filled) {
-      bar += `<span class="${color}">█</span>`;
-    } else {
-      bar += `<span class="gray">░</span>`;
-    }
-  }
-
-  return bar;
-}
-
-function loadRandomQuestion() {
-  document.getElementById("result").innerHTML = "";
+/* =========================
+   랜덤 문제 선택
+========================= */
+function loadQuestion() {
+  document.getElementById("result").innerText = "";
   document.getElementById("nextBtn").style.display = "none";
-  document.getElementById("question").style.display = "block";
 
-  const randomIndex = Math.floor(Math.random() * questions.length);
-  currentQuestion = questions[randomIndex];
+  const q = questions[Math.floor(Math.random() * questions.length)];
 
-  document.getElementById("question").innerText = currentQuestion.question;
+  document.getElementById("question").innerText = q.question;
 
-  const container = document.getElementById("options");
-  container.innerHTML = "";
+  const optionsDiv = document.getElementById("options");
+  optionsDiv.innerHTML = "";
 
-  currentQuestion.options.forEach((opt, index) => {
+  q.options.forEach((opt, i) => {
     const btn = document.createElement("button");
-    btn.innerText = opt.text;
-    btn.className = "option";
+    btn.innerText = opt;
 
-    btn.onclick = () => {
-      container.innerHTML = "";
-      selectedOptionObj = opt;
-      handleVote(index + 1);
+    btn.onclick = async () => {
+      // 1. 데이터 저장
+      await fetch(SUPABASE_URL + "/rest/v1/votes", {
+        method: "POST",
+        headers: {
+          "apikey": SUPABASE_KEY,
+          "Authorization": "Bearer " + SUPABASE_KEY,
+          "Content-Type": "application/json",
+          "Prefer": "return=minimal"
+        },
+        body: JSON.stringify({
+          question_id: q.id,
+          option_id: i
+        })
+      });
+
+      // 2. 결과 가져오기
+      const res = await fetch(
+        SUPABASE_URL + `/rest/v1/votes?question_id=eq.${q.id}`,
+        {
+          headers: {
+            "apikey": SUPABASE_KEY,
+            "Authorization": "Bearer " + SUPABASE_KEY
+          }
+        }
+      );
+
+      const data = await res.json();
+
+      const total = data.length;
+      const selected = data.filter(v => v.option_id === i).length;
+
+      // 초기값 보정 (자연스럽게)
+      const base = 4;
+      const percent = Math.round((selected + 1) / (total + base) * 100);
+
+      document.getElementById("result").innerText =
+        percent + "% chose this option";
+
+      document.getElementById("nextBtn").style.display = "block";
     };
 
-    container.appendChild(btn);
+    optionsDiv.appendChild(btn);
   });
 }
 
-async function handleVote(option) {
+/* =========================
+   다음 문제 버튼
+========================= */
+document.getElementById("nextBtn").onclick = loadQuestion;
 
-  const qid = currentQuestion.id;
-
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/question_counts?question_id=eq.${qid}`, {
-    headers: {
-      "apikey": SUPABASE_KEY,
-      "Authorization": "Bearer " + SUPABASE_KEY
-    }
-  });
-
-  const row = (await res.json())[0];
-
-  let updateData = {};
-  if (option === 1) updateData.option1 = row.option1 + 1;
-  if (option === 2) updateData.option2 = row.option2 + 1;
-  if (option === 3) updateData.option3 = row.option3 + 1;
-  if (option === 4) updateData.option4 = row.option4 + 1;
-
-  await fetch(`${SUPABASE_URL}/rest/v1/question_counts?question_id=eq.${qid}`, {
-    method: "PATCH",
-    headers: {
-      "Content-Type": "application/json",
-      "apikey": SUPABASE_KEY,
-      "Authorization": "Bearer " + SUPABASE_KEY
-    },
-    body: JSON.stringify(updateData)
-  });
-
-  const res2 = await fetch(`${SUPABASE_URL}/rest/v1/question_counts?question_id=eq.${qid}`, {
-    headers: {
-      "apikey": SUPABASE_KEY,
-      "Authorization": "Bearer " + SUPABASE_KEY
-    }
-  });
-
-  const newRow = (await res2.json())[0];
-
-  const counts = [newRow.option1, newRow.option2, newRow.option3, newRow.option4];
-  const total = counts.reduce((a,b)=>a+b,0);
-  const selected = counts[option-1];
-
-  const percent = Math.round((selected + 1) / (total + 4) * 100);
-
-  document.getElementById("question").style.display = "none";
-
-  document.getElementById("result").innerHTML = `
-    <div class="percent">${percent}%</div>
-    <div class="bar">${renderBlocks(percent)}</div>
-
-    <div class="result-text">${selectedOptionObj.result[0]}</div>
-    <div class="result-text">${selectedOptionObj.result[1]}</div>
-  `;
-
-  document.getElementById("nextBtn").style.display = "inline-block";
-}
-
-document.getElementById("nextBtn").onclick = loadRandomQuestion;
-
-loadRandomQuestion();
+/* =========================
+   최초 실행
+========================= */
+loadQuestion();
 </script>
 
 </body>
