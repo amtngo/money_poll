@@ -126,7 +126,7 @@ function loadQuestion() {
 
       // 초기값 보정 (자연스럽게)
       const base = 4;
-      const percent = Math.round((selected + 1) / (total + base) * 100);
+      const percent = ((selected + 1) / (total + base) * 100).toFixed(1);
 
       document.getElementById("result").innerText =
         percent + "% chose this option";
