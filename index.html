@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Poll</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+body {
+  font-family: Arial, sans-serif;
+  text-align: center;
+  padding: 40px;
+  background: #f5f5f5;
+}
+
+#container {
+  max-width: 500px;
+  margin: auto;
+  background: white;
+  padding: 30px;
+  border-radius: 12px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.1);
+}
+
+h2 {
+  font-size: 20px;
+  margin-bottom: 30px;
+}
+
+button {
+  display: block;
+  width: 100%;
+  padding: 15px;
+  margin: 10px 0;
+  font-size: 16px;
+  border: none;
+  border-radius: 8px;
+  background: #333;
+  color: white;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #555;
+}
+
+#result {
+  margin-top: 30px;
+  font-size: 45px;
+  font-weight: bold;
+}
+
+#subtext {
+  margin-top: 10px;
+  font-size: 16px;
+  color: #666;
+}
+
+#nextBtn {
+  margin-top: 20px;
+  background: #007bff;
+}
+</style>
+</head>
+<body>
+
+<div id="container">
+  <h2 id="question">Loading...</h2>
+  <div id="options"></div>
+  <div id="result"></div>
+  <div id="subtext"></div>
+  <button id="nextBtn" style="display:none;">Try another question</button>
+</div>
+
+<script src="questions.js"></script>
+
+<script>
+const SUPABASE_URL = "https://foafvsaggjaaewdchfsj.supabase.co";
+const SUPABASE_KEY = "sb_publishable_ttAwXXUz_ODPDayrjV8X7A_5tB_hCPf";
+
+/* =========================
+   셔플 균등 분배
+========================= */
+let shuffled = JSON.parse(localStorage.getItem("shuffled") || "null");
+let index = parseInt(localStorage.getItem("qIndex") || "0");
+
+function shuffleQuestions() {
+  return [...questions].sort(() => Math.random() - 0.5);
+}
+
+if (!shuffled) {
+  shuffled = shuffleQuestions();
+  localStorage.setItem("shuffled", JSON.stringify(shuffled));
+}
+
+function getNextQuestion() {
+  if (index >= shuffled.length) {
+    shuffled = shuffleQuestions();
+    index = 0;
+  }
+
+  const q = shuffled[index];
+  index++;
+
+  localStorage.setItem("qIndex", index);
+  localStorage.setItem("shuffled", JSON.stringify(shuffled));
+
+  return q;
+}
+
+/* =========================
+   문제 로드
+========================= */
+function loadQuestion() {
+  document.getElementById("result").innerText = "";
+  document.getElementById("subtext").innerText = "";
+  document.getElementById("nextBtn").style.display = "none";
+
+  const q = getNextQuestion();
+
+  document.getElementById("question").innerText = q.question;
+
+  const optionsDiv = document.getElementById("options");
+  optionsDiv.innerHTML = "";
+
+  q.options.forEach((opt, i) => {
+    const btn = document.createElement("button");
+    btn.innerText = opt;
+
+    btn.onclick = async () => {
+
+      // 저장
+      await fetch(SUPABASE_URL + "/rest/v1/votes", {
+        method: "POST",
+        headers: {
+          "apikey": SUPABASE_KEY,
+          "Authorization": "Bearer " + SUPABASE_KEY,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          question_id: q.id,
+          option_id: i
+        })
+      });
+
+      // 데이터 가져오기
+      const res = await fetch(
+        SUPABASE_URL + `/rest/v1/votes?question_id=eq.${q.id}`,
+        {
+          headers: {
+            "apikey": SUPABASE_KEY,
+            "Authorization": "Bearer " + SUPABASE_KEY
+          }
+        }
+      );
+
+      const data = await res.json();
+
+      const total = data.length;
+      const selected = data.filter(v => v.option_id === i).length;
+
+      // 자연스러운 퍼센트
+      const base = 4.2;
+
+      let percent = (
+        (selected + Math.random()) / (total + base) * 100
+      ).toFixed(1);
+
+      document.getElementById("result").innerText =
+        percent + "% chose this option";
+
+      document.getElementById("subtext").innerText =
+        "Most people chose differently";
+
+      document.getElementById("nextBtn").style.display = "block";
+    };
+
+    optionsDiv.appendChild(btn);
+  });
+}
+
+/* =========================
+   다음 문제
+========================= */
+document.getElementById("nextBtn").onclick = loadQuestion;
+
+/* =========================
+   시작
+========================= */
+loadQuestion();
+</script>
+
+</body>
+</html>
