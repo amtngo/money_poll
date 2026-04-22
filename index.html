@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Poll</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+body {
+  font-family: Arial, sans-serif;
+  text-align: center;
+  padding: 40px;
+  background: #f5f5f5;
+}
+
+#container {
+  max-width: 500px;
+  margin: auto;
+  background: white;
+  padding: 30px;
+  border-radius: 12px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.1);
+}
+
+button {
+  width: 100%;
+  padding: 15px;
+  margin: 10px 0;
+  font-size: 16px;
+  border: none;
+  border-radius: 8px;
+  background: #333;
+  color: white;
+  cursor: pointer;
+}
+
+#result {
+  font-size: 48px;
+  font-weight: bold;
+  margin-top: 40px;
+}
+
+#subtext {
+  margin-top: 15px;
+  color: #666;
+}
+
+#nextBtn {
+  margin-top: 30px;
+  background: #007bff;
+}
+</style>
+</head>
+<body>
+
+<div id="container"></div>
+
+<script src="questions.js"></script>
+
+<script>
+const SUPABASE_URL = "https://foafvsaggjaaewdchfsj.supabase.co";
+const SUPABASE_KEY = "sb_publishable_ttAwXXUz_ODPDayrjV8X7A_5tB_hCPf";
+
+/* user_id */
+let userId = localStorage.getItem("user_id");
+if (!userId) {
+  userId = crypto.randomUUID();
+  localStorage.setItem("user_id", userId);
+}
+
+/* 셔플 */
+let shuffled = JSON.parse(localStorage.getItem("shuffled") || "null");
+let index = parseInt(localStorage.getItem("qIndex") || "0");
+
+function shuffleQuestions() {
+  return [...questions].sort(() => Math.random() - 0.5);
+}
+
+if (!shuffled) {
+  shuffled = shuffleQuestions();
+  localStorage.setItem("shuffled", JSON.stringify(shuffled));
+}
+
+function getNextQuestion() {
+  if (index >= shuffled.length) {
+    shuffled = shuffleQuestions();
+    index = 0;
+  }
+  const q = shuffled[index++];
+  localStorage.setItem("qIndex", index);
+  localStorage.setItem("shuffled", JSON.stringify(shuffled));
+  return q;
+}
+
+/* 문제 화면 */
+function showQuestion() {
+  const q = getNextQuestion();
+
+  const html = `
+    <h2>${q.question}</h2>
+    ${q.options.map((opt, i) => `
+      <button onclick="vote('${q.id}', ${i})">${opt}</button>
+    `).join("")}
+  `;
+
+  document.getElementById("container").innerHTML = html;
+}
+
+/* 투표 */
+async function vote(qid, optionId) {
+
+  if (localStorage.getItem("voted_" + qid)) return;
+  localStorage.setItem("voted_" + qid, "true");
+
+  await fetch(SUPABASE_URL + "/rest/v1/votes", {
+    method: "POST",
+    headers: {
+      "apikey": SUPABASE_KEY,
+      "Authorization": "Bearer " + SUPABASE_KEY,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      question_id: qid,
+      option_id: optionId,
+      user_id: userId
+    })
+  });
+
+  const res = await fetch(
+    SUPABASE_URL + `/rest/v1/votes?question_id=eq.${qid}`,
+    {
+      headers: {
+        "apikey": SUPABASE_KEY,
+        "Authorization": "Bearer " + SUPABASE_KEY
+      }
+    }
+  );
+
+  const data = await res.json();
+
+  const total = data.length;
+  const selected = data.filter(v => v.option_id === optionId).length;
+
+  const percent = ((selected / total) * 100).toFixed(1);
+
+  /* 결과 화면 완전 전환 */
+  document.getElementById("container").innerHTML = `
+    <div id="result">${percent}% chose this option</div>
+    <div id="subtext">See how your pattern compares</div>
+    <button id="nextBtn" onclick="showQuestion()">Try another question</button>
+  `;
+}
+
+/* 시작 */
+showQuestion();
+</script>
+
+</body>
+</html>
